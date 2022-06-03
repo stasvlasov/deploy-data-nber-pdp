@@ -1,0 +1,172 @@
+data_description:
+  url:
+    - https://www.nber.org/research/data/us-patents
+    - https://sites.google.com/site/patentdataproject
+  src:
+    - name: Name matching
+      tags: [fuzzy matching, contextual matching]
+      description: The company:patent matching utilized the attached Perl routine. Starting with files of names that had been cleaned using a series of Stata routines (a file of patent assignee names and a file of corporate names from Compustat), this uses a word frequency algorithm to identify exact matches and (scored) likely matches. The likely matches above a threshold score were then examined manually to identify matches.
+      updated: 2007-01
+      authors: Jim Bessen
+      lang: perl
+      url: https://sites.google.com/site/patentdataproject/Home/posts/Name-matching-tool
+    - name: Name standardization routines
+      tags: name standardization
+      description: Stata routines that we used to standardize company names.
+      updated: 2010
+      authors:
+        - Jim Bessen
+        - Gareth Macartney
+        - Bronwyn H. Hall
+      lang: stata
+      url: https://sites.google.com/site/patentdataproject/Home/posts/namestandardizationroutinesuploaded
+      function_in_r:
+        call: nstandr::standardize_cockburn
+        url: https://stasvlasov.github.io/nstandr/reference/standardize_cockburn.html
+  url_archived: https://web.archive.org/web/http://www.researchoninnovation.org/epodata/
+  deploy_data_script: scripts/nber-pdp-download-and-make-rds.r
+  change_logs_url:
+    - https://data.nber.org/patents/errata.txt
+    - https://sites.google.com/site/patentdataproject/Home/posts
+    - https://sites.google.com/site/patentdataproject/user-support-forum
+  data_sets:
+    - title: "Company:patent matching"
+      docs:
+        - "https://users.nber.org/~jbessen/matchdoc.pdf"
+      tags: [name standardization, fuzzy matching]
+      modified: 2010-07-28
+      created: 2001-09-04
+      files:
+        - file: "https://www.nber.org/~jbessen/pdpcohdr.dta.zip"
+          description: "Corporate entity file matched to WRDS Compustat file"
+          tags: [name, match]
+        - file: "https://www.nber.org/~jbessen/dynass.dta.zip"
+          description: "Dynamic match of patent assignee to corporate entity"
+          tags: [match]
+        - file: "https://www.nber.org/~jbessen/assignee.dta.zip"
+          description: "File of patent assignees, including name and unique assignee number (PDPASS)"
+          tags: [std_name]
+        - file: "https://s3.amazonaws.com/data.patentsview.org/download/rawassignee.tsv.zip"
+          description: "Raw assignee information as it appears in the source text and XML files"
+          website: "https://patentsview.org/download/data-download-tables"
+          tags: [name, external]
+        - file: "https://www.nber.org/~jbessen/patassg.dta.zip"
+          description: "All assigned patents"
+          docs: "https://www.nber.org/~jbessen/patassg.txt"
+          tags: [external]
+      get_std_names_rscript: scripts/get_uspto_std_names.r
+      time_range: 1976--2006
+      sources:
+        - name: Compustat
+          full_name: Wharton Research Data Services - North American Compustat
+          website: https://wrds-www.wharton.upenn.edu/
+        - name: USPTO
+          website: https://www.uspto.gov/
+        - name: SDC
+          comments: '"We assume that when an organization is acquired/merged/spun-off that its patents go to the new owner. We use data on mergers and acquisitions of public companies reported in the SDC database to track these changes." (p.1)'
+          website: https://www.refinitiv.com/en/products/sdc-platinum-financial-securities#overview
+    - title: Assigned patents
+      description: "All assigned patents"
+      docs:
+        - "http://www.nber.org/~jbessen/patassg.txt"
+      modified: 2010-07-28
+      created: 2001-09-04
+      files:
+        - "https://www.nber.org/~jbessen/patassg.dta.zip"
+      time_range: 1976--2006
+      sources:
+        - name: USPTO
+          website: https://www.uspto.gov/
+    - title: Utility patents
+      description: "All assigned patents"
+      modified: 2010-07-28
+      created: 2001-09-04
+      files:
+          - file: "https://www.nber.org/~jbessen/pat76_06_assg.dta.zip"
+            description: "All utility patents w. citation data and assignee numbers (if assigned), one record per patent per assignee"
+            docs: "https://docs.google.com/document/d/1FyDsjZHhq7okHWMBOc_E7EquLUoAwwEZYtxw5M3UDTY/edit"
+          - file: "https://www.nber.org/~jbessen/pat76_06_ipc.dta.zip"
+            description: " All utility patents, one record per patent per IPC class"
+          - file: "https://www.nber.org/~jbessen/cite76_06.dta.zip"
+            description: "Citations data (not fully cleaned)"
+            docs: "http://elsa.berkeley.edu/~bhhall/NBER06.html"
+          - file: "https://www.nber.org/~jbessen/orig_gen_76_06.zip"
+            description: "Originality and generality measures"
+      time_range: 1976--2006
+      sources:
+        - name: USPTO
+          website: https://www.uspto.gov/
+    - title: Assignee names
+      description: "The Coname file lists company names and associated assignee identifier."
+      created: 2001-09-04
+      docs: "https://www.nber.org/system/files/working_papers/w8498/w8498.pdf"
+      files:
+          - file: "https://data.nber.org/patents/aconame.zip"
+            docs: "https://data.nber.org/patents/coname.txt"      
+      time_range: 01-1963--12-1999
+      sources:
+        - name: USPTO
+          website: https://www.uspto.gov/
+_papis_local_folder: /Users/stas/lit/harmonizing-organization-names/Hall et al., 2001
+  - The NBER Patent Citation Data File
+abstract: 'This paper describes the database on U.S. patents that we have developed
+  over the past decade, with the goal of making it widely accessible for research.
+  We present main trends in U. S. patenting over the last 30 years, including a variety
+  of original measures constructed with citation data, such as backward and forward
+  citation lags, indices of ''originality'' and ''generality'', self-citations, etc.
+  Many of these measures exhibit interesting differences across the six main technological
+  categories that we have developed (comprising Computers and Communications, Drugs
+  and Medical, Electrical and Electronics, Chemical, Mechanical and Others), differences
+  that call for further research. To stimulate such research, the entire database
+  about 3 million patents and 16 million citations is now available on the NBER website.
+  We discuss key issues that arise in the use of patent citations data, and suggest
+  ways of addressing them. In particular, significant changes over time in the rate
+  of patenting and in the number of citations made, as well as the inevitable truncation
+  of the data, make it very hard to use the raw number of citations received by different
+  patents directly in a meaningful way. To remedy this problem we suggest two alternative
+  approaches: the fixed-effects approach involves scaling citations by the average
+  citation count for a group of patents to which the patent of interest belongs; the
+  quasi-structural approach attempts to distinguish the multiple effects on citation
+  rates via econometric estimation.'
+accessDate: '2022-03-19T15:29:52Z'
+author: Hall, Jaffe and Trajtenberg
+author_list:
+- affiliation: []
+  family: Hall
+  given: Bronwyn
+- affiliation: []
+  family: Jaffe
+  given: Adam
+- affiliation: []
+  family: Trajtenberg
+  given: Manuel
+creators:
+- creatorType: author
+  firstName: Bronwyn H.
+  lastName: Hall
+- creatorType: author
+  firstName: Adam B.
+  lastName: Jaffe
+- creatorType: author
+  firstName: Manuel
+  lastName: Trajtenberg
+date: 2001-10
+doi: 10.3386/w8498
+extra: 'DOI: 10.3386/w8498'
+files:
+- Hall et al., 2001 - The NBER Patent Citation Data File.pdf
+google_scholar_citations:
+- count: 4869
+  date: 2022-06-02
+itemID: NBERw8498
+libraryCatalog: National Bureau of Economic Research
+month: 10
+publisher: National Bureau of Economic Research
+ref: Hall2001
+reportNumber: '8498'
+series: Working Paper Series
+shortTitle: The NBER Patent Citation Data File
+title: 'The NBER Patent Citation Data File: Lessons, Insights and Methodological Tools'
+type: report
+url: http://dx.doi.org/10.3386/w8498
+year: 2001

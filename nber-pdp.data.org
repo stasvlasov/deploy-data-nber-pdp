@@ -1,0 +1,340 @@
+#+title: The NBER U.S. Patent Citations Data File: Lessons, Insights, and Methodological Tools
+webpage https://www.nber.org/research/data/us-patents
+data https://sites.google.com/site/patentdataproject
+
+* Papis bibliography with codes info.yml
+
+#+BEGIN_SRC yaml :tangle info.yml :noweb yes
+  data_description:
+    url:
+      - https://www.nber.org/research/data/us-patents
+      - https://sites.google.com/site/patentdataproject
+    src:
+      - name: Name matching
+        tags: [fuzzy matching, contextual matching]
+        description: The company:patent matching utilized the attached Perl routine. Starting with files of names that had been cleaned using a series of Stata routines (a file of patent assignee names and a file of corporate names from Compustat), this uses a word frequency algorithm to identify exact matches and (scored) likely matches. The likely matches above a threshold score were then examined manually to identify matches.
+        updated: 2007-01
+        authors: Jim Bessen
+        lang: perl
+        url: https://sites.google.com/site/patentdataproject/Home/posts/Name-matching-tool
+      - name: Name standardization routines
+        tags: name standardization
+        description: Stata routines that we used to standardize company names.
+        updated: 2010
+        authors:
+          - Jim Bessen
+          - Gareth Macartney
+          - Bronwyn H. Hall
+        lang: stata
+        url: https://sites.google.com/site/patentdataproject/Home/posts/namestandardizationroutinesuploaded
+        function_in_r:
+          call: nstandr::standardize_cockburn
+          url: https://stasvlasov.github.io/nstandr/reference/standardize_cockburn.html
+    url_archived: https://web.archive.org/web/http://www.researchoninnovation.org/epodata/
+    deploy_data_script: scripts/nber-pdp-download-and-make-rds.r
+    change_logs_url:
+      - https://data.nber.org/patents/errata.txt
+      - https://sites.google.com/site/patentdataproject/Home/posts
+      - https://sites.google.com/site/patentdataproject/user-support-forum
+    data_sets:
+      <<company-patent-matching>>
+      <<assigned-patents>>
+      <<utility-patents>>
+      <<assignee-names-old>>
+  <<papis-export()>>
+#+END_SRC
+
+#+name: papis-export
+#+BEGIN_SRC shell :results replace raw
+  papis --clear-cache
+  papis export --format=yaml 'ref:Hall2001'
+#+END_SRC
+
+* Downloading and making .rds
+#+BEGIN_SRC R :tangle scripts/nber-pdp-download-and-make-rds.r
+  args <- commandArgs(trailingOnly = TRUE)
+  ## usage:
+  ## system("Rscript ./scripts/mdpt-download-and-make-rds.r 5 sdf 6")
+  ## [1] "5"   "sdf" "6"
+
+  ## --------------------------------------------------------------------------------
+  ## Load or Install Packages
+  ## --------------------------------------------------------------------------------
+  for(p in c('yaml'))
+      if(!requireNamespace(p, quietly = TRUE))
+          install.packages(p, repos = 'http://cloud.r-project.org')
+
+  for(p in c('romRDS'))
+      if (!requireNamespace(p, quietly = TRUE))
+          devtools::install_github(paste0("stasvlasov/", p), upgrade = FALSE)
+  ## -------------------------------------------------------------------------------
+
+  ## --------------------------------------------------------------------------------
+  ## Deploy
+  ## --------------------------------------------------------------------------------
+  info <- yaml::read_yaml("info.yml")
+
+  options(timeout=600)
+  ## default is only 60 which is not enough for large data
+  info$metacodes$data_sets |>
+      lapply(`[[`, "files") |>
+      lapply(\(files) { if(is.list(files)) sapply(files, `[[`, "file") else files}) |>
+      unlist() |>
+      sapply(romRDS::deploy_file)
+
+
+  ## get docs
+#+END_SRC
+
+* Coding datasets with name harmonization and matching
+
+** Company:patent matching
+#+name: company-patent-matching
+#+BEGIN_SRC yaml
+  - title: "Company:patent matching"
+    docs:
+      - "https://users.nber.org/~jbessen/matchdoc.pdf"
+    tags: [name standardization, fuzzy matching]
+    modified: 2010-07-28
+    created: 2001-09-04
+    files:
+      - file: "https://www.nber.org/~jbessen/pdpcohdr.dta.zip"
+        description: "Corporate entity file matched to WRDS Compustat file"
+        tags: [name, match]
+      - file: "https://www.nber.org/~jbessen/dynass.dta.zip"
+        description: "Dynamic match of patent assignee to corporate entity"
+        tags: [match]
+      - file: "https://www.nber.org/~jbessen/assignee.dta.zip"
+        description: "File of patent assignees, including name and unique assignee number (PDPASS)"
+        tags: [std_name]
+      - file: "https://s3.amazonaws.com/data.patentsview.org/download/rawassignee.tsv.zip"
+        description: "Raw assignee information as it appears in the source text and XML files"
+        website: "https://patentsview.org/download/data-download-tables"
+        tags: [name, external]
+      - file: "https://www.nber.org/~jbessen/patassg.dta.zip"
+        description: "All assigned patents"
+        docs: "https://www.nber.org/~jbessen/patassg.txt"
+        tags: [external]
+    get_std_names_rscript: scripts/get_uspto_std_names.r
+    time_range: 1976--2006
+    sources:
+      - name: Compustat
+        full_name: Wharton Research Data Services - North American Compustat
+        website: https://wrds-www.wharton.upenn.edu/
+      - name: USPTO
+        website: https://www.uspto.gov/
+      - name: SDC
+        comments: '"We assume that when an organization is acquired/merged/spun-off that its patents go to the new owner. We use data on mergers and acquisitions of public companies reported in the SDC database to track these changes." (p.1)'
+        website: https://www.refinitiv.com/en/products/sdc-platinum-financial-securities#overview
+#+END_SRC
+
+#+BEGIN_SRC R :tangle scripts/get_uspto_std_names.r
+  ## assume that we start in /scripts
+  setwd("..")
+
+  ## --------------------------------------------------------------------------------
+  ## Load or Install Packages
+  ## --------------------------------------------------------------------------------
+  ## from CRAN
+  for(p in c('yaml'
+           , 'pbapply'))
+      if(!requireNamespace(p, quietly = TRUE))
+          install.packages(p, repos = 'http://cloud.r-project.org')
+  ## from GitHub
+  for(p in c('romRDS'))
+      if (!requireNamespace(p, quietly = TRUE))
+          devtools::install_github(paste0("stasvlasov/", p), upgrade = FALSE)
+  ## -------------------------------------------------------------------------------
+
+  get_data_set_by_title <- function(data_sets_list, title) {
+      for (ds in data_sets_list) {
+          !is.null(ds$title) && ds$title == title && return(ds)
+      }
+  }
+
+  get_data_set_files <- function(ds) {
+      if(is.list(ds$files)) {
+          sapply(ds$files, `[[`, "file")
+      } else {
+          ds$files
+      }
+  }
+
+
+
+
+  ## filter_pdpass_that_did_not_change <- function(tb) {
+  ##     tb[is.na(tb$pdpco2),]
+  ## }
+
+
+  get_patents_with_single_assignee <- function(tb) {
+      tb[tb$assgnum == 1,]
+  }
+
+  find_name_for_org <- function(pdpass) {
+      ## patents with single assignee
+      dt <- data$`https://www.nber.org/~jbessen/patassg.dta.zip` |>
+          get_patents_with_single_assignee()
+      match <- which(dt$pdpass == pdpass)
+      if(length(match) < 1) return(NA)
+      patnum <- dt[match[1],]$patnum
+      pat <- data$`https://s3.amazonaws.com/data.patentsview.org/download/rawassignee.tsv.zip`
+      pat <- pat[pat$patent_id == patnum, ]
+      if(nrow(pat) != 1) return(NA)
+      else return(pat$organization)
+  }
+
+  romRDS::romRDS("nber_std_names"
+               , {
+                   ## info <- yaml::read_yaml("info.yml")
+                   ## options(timeout=600)
+                   ## ## default is only 60 which is not enough for large data
+                   ## data <- 
+                   ##     info$metacodes$data_sets |>
+                   ##     get_data_set_by_title("Company:patent matching") |>
+                   ##     get_data_set_files() |>
+                   ##     pbapply::pbsapply(romRDS::deploy_file) |>
+                   ##     pbapply::pblapply(readRDS) |>
+                   ##     pbapply::pblapply(data.table::as.data.table)
+                   with(data$`https://www.nber.org/~jbessen/assignee.dta.zip`
+                      , {
+                          data.table::data.table(
+                                          std_name = standard_name
+                                        , name = pdpass |>
+                                              pbapply::pbsapply(find_name_for_org)
+                                      )
+                      })
+               }
+             , dir = "data/rds") 
+
+#+END_SRC
+
+** Assigned patents
+#+name: assigned-patents
+#+BEGIN_SRC yaml
+  - title: Assigned patents
+    description: "All assigned patents"
+    docs:
+      - "http://www.nber.org/~jbessen/patassg.txt"
+    modified: 2010-07-28
+    created: 2001-09-04
+    files:
+      - "https://www.nber.org/~jbessen/patassg.dta.zip"
+    time_range: 1976--2006
+    sources:
+      - name: USPTO
+        website: https://www.uspto.gov/
+#+END_SRC
+
+#+BEGIN_SRC R
+  info <- yaml::read_yaml("info.yml")
+
+  options(timeout=600)
+  ## default is only 60 which is not enough for large data
+
+  rds_files <- info$metacodes$data_sets[[2]]$files |>
+      (\(files) { if(is.list(files)) sapply(files, `[[`, "file") else files})() |>
+                                                                            sapply(romRDS::deploy_file)
+
+  data <-
+      lapply(rds_files, readRDS) |>
+      lapply(data.table::as.data.table)
+
+  data
+#+END_SRC
+
+** Utility patents
+
+#+name: utility-patents
+#+BEGIN_SRC yaml
+  - title: Utility patents
+    description: "All assigned patents"
+    modified: 2010-07-28
+    created: 2001-09-04
+    files:
+        - file: "https://www.nber.org/~jbessen/pat76_06_assg.dta.zip"
+          description: "All utility patents w. citation data and assignee numbers (if assigned), one record per patent per assignee"
+          docs: "https://docs.google.com/document/d/1FyDsjZHhq7okHWMBOc_E7EquLUoAwwEZYtxw5M3UDTY/edit"
+        - file: "https://www.nber.org/~jbessen/pat76_06_ipc.dta.zip"
+          description: " All utility patents, one record per patent per IPC class"
+        - file: "https://www.nber.org/~jbessen/cite76_06.dta.zip"
+          description: "Citations data (not fully cleaned)"
+          docs: "http://elsa.berkeley.edu/~bhhall/NBER06.html"
+        - file: "https://www.nber.org/~jbessen/orig_gen_76_06.zip"
+          description: "Originality and generality measures"
+    time_range: 1976--2006
+    sources:
+      - name: USPTO
+        website: https://www.uspto.gov/
+#+END_SRC
+
+#+BEGIN_SRC R
+  ## --------------------------------------------------------------------------------
+  ## Load or Install Packages
+  ## --------------------------------------------------------------------------------
+  for(p in c('yaml'
+           , 'pbapply'))
+      if(!requireNamespace(p, quietly = TRUE))
+          install.packages(p, repos = 'http://cloud.r-project.org')
+  for(p in c('romRDS'))
+      if (!requireNamespace(p, quietly = TRUE))
+          devtools::install_github(paste0("stasvlasov/", p), upgrade = FALSE)
+  ## -------------------------------------------------------------------------------
+
+  info <- yaml::read_yaml("info.yml")
+
+  options(timeout=600)
+
+  ## default is only 60 which is not enough for large data
+  rds_files <- info$metacodes$data_sets[[3]]$files
+  rds_files <- if(is.list(rds_files)) sapply(rds_files, `[[`, "file") else rds_files
+  rds_files <- sapply(rds_files, romRDS::deploy_file)
+  rds_files <- rds_files[!sapply(rds_files, is.null)]                                                             
+
+  data <-
+      pblapply(rds_files, readRDS) |>
+      pblapply(data.table::as.data.table)
+
+
+  data
+
+  with(data
+     , data.table::data.table(
+                       name = app_name
+                     , std_name = std_name
+                     , country = ctry_code
+                     , type = ifelse(ind == 1, "indiv"
+                                   , ifelse(nbo == 1, NA, "firm"))
+                   ))
+#+END_SRC
+
+** Old datasets
+#+name: assignee-names-old
+#+BEGIN_SRC yaml
+  - title: Assignee names
+    description: "The Coname file lists company names and associated assignee identifier."
+    created: 2001-09-04
+    docs: "https://www.nber.org/system/files/working_papers/w8498/w8498.pdf"
+    files:
+        - file: "https://data.nber.org/patents/aconame.zip"
+          docs: "https://data.nber.org/patents/coname.txt"      
+    time_range: 01-1963--12-1999
+    sources:
+      - name: USPTO
+        website: https://www.uspto.gov/
+#+END_SRC
+
+#+BEGIN_SRC R
+  rds_files_old <- info$metacodes$data_sets[[4]]$files |>
+      (\(files) { if(is.list(files)) sapply(files, `[[`, "file") else files})() |>
+                                                                            sapply(romRDS::deploy_file)
+
+  data_old <-
+      pbapply::pblapply(rds_files_old[1], readRDS) |>
+      pbapply::pblapply(data.table::as.data.table)
+
+
+  data_old[[1]]$ASSIGNEE |>
+      summary()
+#+END_SRC
